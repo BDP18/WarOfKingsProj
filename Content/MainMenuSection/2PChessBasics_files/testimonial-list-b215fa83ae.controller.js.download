@@ -1,0 +1,58 @@
+define(["require", "exports", "angularDependency", "angularDependency", "academy/testimonials/testimonials.service"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("testimonial-list.controller", ["testimonials.service"]);
+    var TestimonialListController = (function () {
+        function TestimonialListController(testimonialsService) {
+            this.isLoading = true;
+            this.testimonialList = [];
+            this.testimonialsService = testimonialsService;
+            this.loadTestimonialList();
+        }
+        TestimonialListController.prototype.loadTestimonialList = function () {
+            var _this = this;
+            var element = document.getElementById("feedbackCarousel");
+            var lessonId;
+            var courseId;
+            if (element) {
+                lessonId = parseInt(element.getAttribute("data-lesson-id"));
+                courseId = parseInt(element.getAttribute("data-course-id"));
+            }
+            this.testimonialsService.getTestimonialsForLessonPage(lessonId, courseId)
+                .then(function (testimonialList) {
+                _this.testimonialList = testimonialList;
+                _this.shuffle(_this.testimonialList);
+            })["finally"](function () {
+                _this.isLoading = false;
+                _this.startCarousel();
+            });
+        };
+        TestimonialListController.prototype.truncateFeedbackString = function (str, truncateLength) {
+            var truncatedString = str;
+            if (str.length > truncateLength) {
+                truncatedString = str.slice(0, (truncateLength - 1)) + "...";
+            }
+            return truncatedString;
+        };
+        TestimonialListController.prototype.shuffle = function (array) {
+            var currentIndex = array.length;
+            var temporaryValue;
+            var randomIndex;
+            while (0 !== currentIndex) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex -= 1;
+                temporaryValue = array[currentIndex];
+                array[currentIndex] = array[randomIndex];
+                array[randomIndex] = temporaryValue;
+            }
+        };
+        TestimonialListController.prototype.startCarousel = function () {
+            $("#feedbackCarousel").carousel("cycle");
+        };
+        TestimonialListController.$inject = ["testimonialsService", "MemberInfoService"];
+        return TestimonialListController;
+    }());
+    module.controller("TestimonialListController", TestimonialListController);
+});
+
+//# sourceMappingURL=testimonial-list.controller.js.map

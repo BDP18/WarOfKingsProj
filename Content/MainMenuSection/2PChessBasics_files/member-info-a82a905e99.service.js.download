@@ -1,0 +1,82 @@
+define(["require", "exports", "angularDependency", "util/value-proxy", "angularDependency", "util/value-proxy"], function (require, exports, angular, ValueProxy) {
+    "use strict";
+    exports.__esModule = true;
+    var CocoonType;
+    (function (CocoonType) {
+        CocoonType["AGNOSTIC"] = "AGNOSTIC";
+        CocoonType["CX"] = "CX";
+        CocoonType["HOMESCHOOL"] = "HOMESCHOOL";
+        CocoonType["NONE"] = "NONE";
+        CocoonType["TEST_PREP"] = "TEST_PREP";
+    })(CocoonType = exports.CocoonType || (exports.CocoonType = {}));
+    var MemberInfo = (function () {
+        function MemberInfo() {
+            this.hasInstitutionLicense = false;
+            this.isDomestic = false;
+            this.isLoggedIn = false;
+            this.isTestPrep = false;
+            this.isFamilyAdminActingAsStudent = false;
+            this.isFamilyPlanStudent = false;
+        }
+        return MemberInfo;
+    }());
+    exports.MemberInfo = MemberInfo;
+    var MemberInfoService = (function () {
+        function MemberInfoService($q) {
+            this.$q = $q;
+            this.memberInfoProxy = new ValueProxy(this.buildMemberInfoFromDOM(), this.memberInfoLoader.bind(this));
+        }
+        MemberInfoService.prototype.memberInfoLoader = function () {
+            var deferred = this.$q.defer();
+            var memberInfo = this.buildMemberInfoFromDOM();
+            deferred.resolve(memberInfo);
+            return deferred.promise;
+        };
+        MemberInfoService.prototype.buildMemberInfoFromDOM = function () {
+            var memberInfo = new MemberInfo();
+            var memberDataElement = document.querySelector("#memberData");
+            if (memberDataElement) {
+                memberInfo.cocoon = memberDataElement.getAttribute("data-cocoon");
+                var cocoonTypeStr = memberDataElement.getAttribute("data-cocoon-type");
+                memberInfo.cocoonType = (cocoonTypeStr) ? cocoonTypeStr : CocoonType.NONE;
+                memberInfo.memberId = this.getNumberAttribute(memberDataElement, "data-member-id");
+                memberInfo.isDomestic = this.getBooleanAttribute(memberDataElement, "data-is-domestic");
+                memberInfo.isLoggedIn = !isNaN(memberInfo.memberId);
+                memberInfo.isTestPrep = this.getBooleanAttribute(memberDataElement, "data-is-test-prep");
+                memberInfo.isFamilyAdminActingAsStudent = this.getBooleanAttribute(memberDataElement, "data-is-family-admin-acting-as-student");
+                memberInfo.isFamilyPlanStudent = this.getBooleanAttribute(memberDataElement, "data-is-family-plan-student");
+                memberInfo.paymentProviderStatus = memberDataElement.getAttribute("data-member-status");
+                memberInfo.productKey = memberDataElement.getAttribute("data-member-product-key");
+                memberInfo.accountType = memberDataElement.getAttribute("data-member-account-type");
+                memberInfo.persona = memberDataElement.getAttribute("data-member-persona");
+                memberInfo.firstName = memberDataElement.getAttribute("data-member-first-name");
+                memberInfo.goalKey = memberDataElement.getAttribute("data-goal-key");
+                memberInfo.hasInstitutionLicense = this.getBooleanAttribute(memberDataElement, "data-member-has-institution-license");
+                memberInfo.taxStatus = memberDataElement.getAttribute("data-tax-status");
+                memberInfo.schoologyId = memberDataElement.getAttribute("data-schoology-id");
+                memberInfo.canvasId = memberDataElement.getAttribute("data-canvas-id");
+                memberInfo.googleUserId = memberDataElement.getAttribute("data-google-user-id");
+                memberInfo.isPaidTrialEligible = this.getBooleanAttribute(memberDataElement, "data-is-paid-trial-eligible");
+            }
+            return memberInfo;
+        };
+        MemberInfoService.prototype.getNumberAttribute = function (memberDataElement, attributeName) {
+            var attrValueStr = memberDataElement.getAttribute(attributeName);
+            return parseInt(attrValueStr, 10);
+        };
+        MemberInfoService.prototype.getBooleanAttribute = function (memberDataElement, attributeName) {
+            var attrValueStr = memberDataElement.getAttribute(attributeName);
+            if (!attrValueStr) {
+                return false;
+            }
+            return attrValueStr.toLowerCase() === "true";
+        };
+        MemberInfoService.$inject = ["$q"];
+        return MemberInfoService;
+    }());
+    exports.MemberInfoService = MemberInfoService;
+    var module = angular.module("member-info.service", []);
+    module.service("MemberInfoService", MemberInfoService);
+});
+
+//# sourceMappingURL=member-info.service.js.map

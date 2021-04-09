@@ -1,0 +1,199 @@
+define(["require", "exports", "angularDependency", "util/value-proxy", "angularDependency", "angular/util/http-post-params-as-form.provider", "jquery", "util/value-proxy"], function (require, exports, angular, ValueProxy) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("custom-course.service", ["study.http-post-params-as-form"]);
+    var CustomCourseService = (function () {
+        function CustomCourseService($http, $q, httpPostParamsAsFormConfig) {
+            this._COURSE_LIMIT = 15;
+            this._TOPICS_IN_COURSE_LIMIT = 50;
+            this._LESSONS_IN_COURSE_LIMIT = 75;
+            this.MIN_TITLE_LENGTH = 7;
+            this.MAX_TITLE_LENGTH = 200;
+            this.ERRORS = {
+                GENERIC: "An error occurred",
+                BLANK_TITLE: "Title is blank",
+                SHORT_TITLE: "Title is too short",
+                LONG_TITLE: "Title is too long",
+                DUPLICATE_TITLE: "There is already a course with this title",
+                INVALID: "Failed to send a valid request",
+                NOT_FOUND: "Error reaching service",
+                DENIED: "Failed to fulfill request"
+            };
+            this.$http = $http;
+            this.httpPostParamsAsFormConfig = httpPostParamsAsFormConfig;
+            this.postRequestPromiseChain = $q.when();
+            this.courseListProxy = this.createCourseListProxy();
+        }
+        CustomCourseService.prototype.generateError = function (response) {
+            if (response.status === 200 || response.status === 201) {
+                return null;
+            }
+            var message = this.ERRORS.GENERIC;
+            var errorDetail = "";
+            if (response.status === 400) {
+                if (response.data.titleIsBlank) {
+                    message = this.ERRORS.BLANK_TITLE;
+                    errorDetail = "Must be at least " + this.MIN_TITLE_LENGTH + " characters long.";
+                }
+                else if (response.data.titleIsTooShort) {
+                    message = this.ERRORS.SHORT_TITLE;
+                    errorDetail = "Must be at least " + this.MIN_TITLE_LENGTH + " characters long.";
+                }
+                else if (response.data.titleIsTooLong) {
+                    message = this.ERRORS.LONG_TITLE;
+                    errorDetail = "Must be at most " + this.MAX_TITLE_LENGTH + " characters long.";
+                }
+                else {
+                    message = this.ERRORS.INVALID;
+                }
+            }
+            else if (response.status === 403 || response.status === 0) {
+                message = this.ERRORS.DENIED;
+            }
+            else if (response.status === 404) {
+                message = this.ERRORS.NOT_FOUND;
+            }
+            else if (response.status === 409) {
+                message = this.ERRORS.DUPLICATE_TITLE;
+            }
+            return {
+                error: message,
+                errorDetail: errorDetail,
+                status: response.status
+            };
+        };
+        CustomCourseService.prototype.makeAjaxRequest = function (url, data) {
+            var _this = this;
+            this.postRequestPromiseChain = this.postRequestPromiseChain.then(function () {
+                return _this.$http.post(url, data, _this.httpPostParamsAsFormConfig)
+                    .then(function (response) {
+                    var error = _this.generateError(response);
+                    if (!error) {
+                        return response.data;
+                    }
+                    else {
+                        return error;
+                    }
+                })["catch"](function (response) {
+                    return _this.generateError(response);
+                });
+            });
+            return this.postRequestPromiseChain;
+        };
+        CustomCourseService.prototype.addLessonToTopic = function (lessonId, topicId, courseId) {
+            var requestData = {
+                lessonAcademyAssetId: lessonId,
+                topicAcademyAssetId: topicId,
+                courseAcademyAssetId: courseId
+            };
+            return this.makeAjaxRequest("/academy/custom/add-lesson-to-topic.ajax", requestData);
+        };
+        CustomCourseService.prototype.addLessonToEmptyCourse = function (lessonId, courseId) {
+            var requestData = {
+                lessonAcademyAssetId: lessonId,
+                courseAcademyAssetId: courseId
+            };
+            return this.makeAjaxRequest("/academy/custom/add-lesson-to-empty-course.ajax", requestData);
+        };
+        CustomCourseService.prototype.createTopic = function (courseId, title, sequence) {
+            var requestData = {
+                parentAcademyAssetTreeId: courseId,
+                title: title,
+                description: '',
+                sequence: sequence
+            };
+            return this.makeAjaxRequest("/academy/custom/create-topic.ajax", requestData);
+        };
+        CustomCourseService.prototype.createCourse = function (title, firstLessonId) {
+            var requestData = {
+                title: title,
+                description: ''
+            };
+            if (firstLessonId) {
+                requestData.firstLessonAcademyAssetId = firstLessonId;
+            }
+            return this.makeAjaxRequest("/academy/custom/create-course.ajax", requestData);
+        };
+        CustomCourseService.prototype.updateCourse = function (data) {
+            return this.makeAjaxRequest("/academy/custom/update.ajax", data);
+        };
+        CustomCourseService.prototype.updateSequences = function (sequenceData) {
+            var _this = this;
+            this.postRequestPromiseChain = this.postRequestPromiseChain.then(function () {
+                return _this.$http.post("/academy/custom/bulk-sequence-update.ajax", sequenceData)
+                    .then(function (response) {
+                    var error = _this.generateError(response);
+                    if (!error) {
+                        return response.data;
+                    }
+                    else {
+                        return error;
+                    }
+                })["catch"](function (response) {
+                    return _this.generateError(response);
+                });
+            });
+            return this.postRequestPromiseChain;
+        };
+        CustomCourseService.prototype.removeItem = function (item) {
+            var courseAssetId;
+            if (item.type.toLowerCase() === "course") {
+                courseAssetId = item.academyAssetId;
+            }
+            else {
+                courseAssetId = item.mDynamicIntFields.courseAcademyAssetId;
+            }
+            var requestData = {
+                academyAssetId: item.academyAssetId,
+                courseAcademyAssetId: courseAssetId,
+                type: item.type
+            };
+            return this.makeAjaxRequest("/academy/custom/remove-item.ajax", requestData);
+        };
+        CustomCourseService.prototype.getCourseByAcademyAssetId = function (academyAssetId) {
+            var config = {
+                params: {
+                    courseAcademyAssetId: academyAssetId
+                }
+            };
+            return this.$http.get("/academy/custom/get-course.ajax", config)
+                .then(function (response) {
+                return response.data;
+            });
+        };
+        CustomCourseService.prototype.getCourse = function (academyAssetTreeId) {
+            var config = {
+                params: {
+                    courseAcademyAssetTreeId: academyAssetTreeId
+                }
+            };
+            return this.$http.get("/academy/custom/get-course.ajax", config)
+                .then(function (response) {
+                return response.data;
+            });
+        };
+        CustomCourseService.prototype.createCourseListProxy = function () {
+            var _this = this;
+            return new ValueProxy([], function () {
+                return _this.$http.get("/academy/custom/course-list.ajax")
+                    .then(function (response) {
+                    var courseList = response.data;
+                    for (var i = 0; i < courseList.length; i++) {
+                        var course = courseList[i];
+                        if (typeof course.datePublished == 'string') {
+                            course.datePublishedRaw = course.datePublished;
+                            course.datePublished = Date.parse(course.datePublished);
+                        }
+                    }
+                    return courseList;
+                });
+            });
+        };
+        CustomCourseService.$inject = ["$http", "$q", "httpPostParamsAsFormConfig"];
+        return CustomCourseService;
+    }());
+    exports.CustomCourseService = CustomCourseService;
+    module.service("customCourseService", CustomCourseService);
+});
+
+//# sourceMappingURL=custom-course.service.js.map

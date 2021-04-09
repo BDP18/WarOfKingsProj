@@ -1,0 +1,133 @@
+define(["require", "exports", "angularDependency", "angular/modal/study-modal.directive", "angular/util/lazy-load.module", "lib/angular/ui-bootstrap"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("study.modal", ["lazy-load.module", "study.modal-directive", "ui.bootstrap"]);
+    var StudyModalService = (function () {
+        function StudyModalService($q, $uibModalStack, $uibModal, lazyLoadService) {
+            this.SIZE_SMALL = "sm";
+            this.SIZE_MEDIUM = "md";
+            this.SIZE_LARGE = "lg";
+            this.$q = $q;
+            this.$modalStack = $uibModalStack;
+            this.$uibModal = $uibModal;
+            this.lazyLoadService = lazyLoadService;
+        }
+        StudyModalService.prototype.openSimpleConfirmModal = function (config) {
+            var modalController = ["$scope", function ($scope) {
+                    if (config.bodyDialog) {
+                        $scope.bodyDialog = config.bodyDialog;
+                    }
+                    if (config.bodyTemplateUrl) {
+                        $scope.bodyTemplateUrl = config.bodyTemplateUrl;
+                    }
+                    $scope.cnamePrefix = config.cnamePrefix;
+                    if (config.cancelClass) {
+                        $scope.cancelClass = config.cancelClass;
+                    }
+                    $scope.confirmClass = (config.confirmClass) ? config.confirmClass : "btn-error";
+                    $scope.confirmText = (config.confirmText) ? config.confirmText : "Confirm";
+                    $scope.title = config.title;
+                }];
+            return this.openModal(modalController, config.size || this.SIZE_SMALL, "/templates/modal/simple-confirm-modal.tpl");
+        };
+        StudyModalService.prototype.openSimpleErrorModal = function (config) {
+            var modalController = ["$scope", function ($scope) {
+                    if (config.bodyDialog) {
+                        $scope.bodyDialog = config.bodyDialog;
+                    }
+                    if (config.bodyTemplateUrl) {
+                        $scope.bodyTemplateUrl = config.bodyTemplateUrl;
+                    }
+                    $scope.cnamePrefix = config.cnamePrefix;
+                    $scope.dismissClass = (config.dismissClass) ? config.dismissClass : "btn-link";
+                    $scope.dismissText = (config.dismissText) ? config.dismissText : "Dismiss";
+                    $scope.title = config.title;
+                }];
+            return this.openModal(modalController, config.size || this.SIZE_SMALL, "/templates/modal/simple-error-modal.tpl");
+        };
+        StudyModalService.prototype.openSimpleOkModal = function (config) {
+            var modalController = ["$scope", function ($scope) {
+                    if (config.bodyDialog) {
+                        $scope.bodyDialog = config.bodyDialog;
+                    }
+                    if (config.bodyTemplateUrl) {
+                        $scope.bodyTemplateUrl = config.bodyTemplateUrl;
+                    }
+                    $scope.cnamePrefix = config.cnamePrefix;
+                    $scope.okClass = config.okClass || "btn-primary";
+                    $scope.okText = config.okText || "OK";
+                    $scope.title = config.title;
+                }];
+            return this.openModal(modalController, config.size || this.SIZE_SMALL, "/templates/modal/simple-ok-modal.tpl", undefined, "static");
+        };
+        StudyModalService.prototype.openSimpleWaitingModal = function (config) {
+            var modalController = ["$scope", function ($scope) {
+                    if (config.bodyDialog) {
+                        $scope.bodyDialog = config.bodyDialog;
+                    }
+                    if (config.bodyTemplateUrl) {
+                        $scope.bodyTemplateUrl = config.bodyTemplateUrl;
+                    }
+                    $scope.cnamePrefix = config.cnamePrefix;
+                    $scope.title = config.title;
+                }];
+            return this.openModal(modalController, config.size || this.SIZE_SMALL, "/templates/modal/simple-waiting-modal.tpl", undefined, "static");
+        };
+        StudyModalService.prototype.openModal = function (modalController, size, templateUrl, windowClass, backdrop) {
+            var completeWindowClass = "academy-modal";
+            if (windowClass) {
+                completeWindowClass = completeWindowClass + " " + windowClass;
+            }
+            var modalOpts = {
+                bindToController: true,
+                controller: modalController,
+                controllerAs: 'modalCtrl',
+                keyboard: true,
+                size: size,
+                templateUrl: templateUrl,
+                windowClass: completeWindowClass
+            };
+            if (backdrop !== undefined) {
+                modalOpts.backdrop = backdrop;
+            }
+            return this.$uibModal.open(modalOpts);
+        };
+        ;
+        StudyModalService.prototype.openModalByConfigWithLazyLoad = function (modalSettings) {
+            var _this = this;
+            if (modalSettings.lazyLoadAngularModuleName && modalSettings.lazyLoadRequireModuleName) {
+                return this.lazyLoadService.getOrLoadModule(modalSettings.lazyLoadAngularModuleName, modalSettings.lazyLoadRequireModuleName)
+                    .then(function () {
+                    return _this.openModalByConfig(modalSettings);
+                });
+            }
+            else {
+                return this.$q.when(this.openModalByConfig(modalSettings));
+            }
+        };
+        StudyModalService.prototype.openModalByConfig = function (modalSettings) {
+            if (modalSettings.bindToController === undefined) {
+                modalSettings.bindToController = true;
+            }
+            if (modalSettings.keyboard === undefined) {
+                modalSettings.keyboard = true;
+            }
+            if (modalSettings.size === undefined) {
+                modalSettings.size = "sm";
+            }
+            return this.$uibModal.open(modalSettings);
+        };
+        StudyModalService.prototype.closeAllModals = function () {
+            this.$modalStack.dismissAll();
+        };
+        StudyModalService.SIZE_SMALL = "sm";
+        StudyModalService.SIZE_MEDIUM = "md";
+        StudyModalService.SIZE_LARGE = "lg";
+        StudyModalService.$inject = ["$q", "$uibModalStack", "$uibModal", "LazyLoadService"];
+        return StudyModalService;
+    }());
+    exports.StudyModalService = StudyModalService;
+    module.service("studyModalService", StudyModalService);
+});
+
+//# sourceMappingURL=study-modal.service.js.map

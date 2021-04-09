@@ -1,0 +1,77 @@
+define(["require", "exports", "angularDependency", "angular/modal/study-modal.service", "angularDependency", "angular/modal/study-modal.service"], function (require, exports, angular, study_modal_service_1) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("academic-citation.module", ["study.modal"]);
+    var AcademicCitationModalController = (function () {
+        function AcademicCitationModalController(accessed, published, title, uri) {
+            this.accessed = accessed;
+            this.published = published;
+            this.title = title;
+            this.uri = uri;
+        }
+        AcademicCitationModalController.prototype.copyToClipboard = function (textAreaId) {
+            var elementToCopy = $(".academic-citation-modal [data-copy-id='" + textAreaId + "']");
+            elementToCopy.select();
+            document.execCommand("copy");
+            elementToCopy.blur();
+        };
+        AcademicCitationModalController.$inject = ["accessed", "published", "title", "uri"];
+        return AcademicCitationModalController;
+    }());
+    var OpenAcademicCitationController = (function () {
+        function OpenAcademicCitationController(studyModalService) {
+            this.studyModalService = studyModalService;
+            this.accessed = Date.now();
+        }
+        OpenAcademicCitationController.prototype.showCitationModal = function () {
+            var _this = this;
+            var modalSettings = {
+                controller: AcademicCitationModalController,
+                controllerAs: "academicCitationModalCtrl",
+                templateUrl: OpenAcademicCitationController.MODAL_TEMPLATE_URL,
+                size: study_modal_service_1.StudyModalService.SIZE_MEDIUM,
+                windowClass: "academic-citation-modal",
+                resolve: {
+                    accessed: this.accessed,
+                    published: function () { return _this.published; },
+                    title: function () { return _this.title; },
+                    uri: function () { return _this.uri; }
+                }
+            };
+            this.studyModalService.openModalByConfig(modalSettings).result["catch"](function (reason) { });
+        };
+        OpenAcademicCitationController.MODAL_TEMPLATE_URL = "/templates/academy/lesson/academic-citation.tpl";
+        OpenAcademicCitationController.$inject = ["studyModalService"];
+        return OpenAcademicCitationController;
+    }());
+    module.filter("punctuateTitle", function () {
+        return function (title) {
+            var hasEndingPunctuation = title.match(/[.!?]$/) != null;
+            if (hasEndingPunctuation) {
+                return title;
+            }
+            return title + ".";
+        };
+    });
+    module.directive("academicCitationButton", function () {
+        return {
+            restrict: "E",
+            template: "<div class='academic-citation-btn'>"
+                + "	<button ng-click='openCitationCtrl.showCitationModal()' class='academic-citation-btn__button' data-cname='cite_this_lesson_button' test-id='cite_this_lesson_button'>"
+                + "		<span class='academic-citation-btn__label'>Cite this lesson</span>"
+                + "		<i class='academic-citation-btn__icon'><img src='/images/reDesign/svg/icon_citation_bubble.svg'/></i>"
+                + "	</button>"
+                + "</div>",
+            scope: {
+                uri: '@',
+                title: '@',
+                published: '@'
+            },
+            bindToController: true,
+            controller: OpenAcademicCitationController,
+            controllerAs: "openCitationCtrl"
+        };
+    });
+});
+
+//# sourceMappingURL=academic-citation.module.js.map

@@ -1,0 +1,84 @@
+define(["require", "exports", "angularDependency", "angularDependency"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("lazy-load.module", []);
+    var LazyLoadService = (function () {
+        function LazyLoadService($injector, $q) {
+            this.$injector = $injector;
+            this.$q = $q;
+        }
+        LazyLoadService.prototype.getOrLoadModule = function (moduleName, requirePath) {
+            var _this = this;
+            if (this.$injector.modules[moduleName]) {
+                return this.$q.when();
+            }
+            var deferred = this.$q.defer();
+            require([requirePath], function () {
+                if (_this.$injector.modules[moduleName]) {
+                    deferred.resolve();
+                }
+                _this.$injector.loadNewModules([moduleName]);
+                deferred.resolve();
+            }, function () {
+                deferred.reject();
+            });
+            return deferred.promise;
+        };
+        LazyLoadService.prototype.getOrLoadInjectable = function (moduleName, requirePath, injectableName) {
+            var _this = this;
+            if (this.$injector.has(injectableName)) {
+                return this.$q.when(this.$injector.get(injectableName));
+            }
+            return this.getOrLoadModule(moduleName, requirePath)
+                .then(function () {
+                if (_this.$injector.has(injectableName)) {
+                    return _this.$q.when(_this.$injector.get(injectableName));
+                }
+                throw "unable to load injectable=" + injectableName + " module=" + moduleName + " requirePath=" + requirePath;
+            });
+        };
+        LazyLoadService.lazyLoadModuleForUiRouter = function ($transition, requireModule, angularModule) {
+            var injector = $transition.injector();
+            var lazyLoadService = injector.get("LazyLoadService");
+            return lazyLoadService.getOrLoadModule(angularModule, requireModule);
+        };
+        LazyLoadService.$inject = ["$injector", "$q"];
+        return LazyLoadService;
+    }());
+    exports.LazyLoadService = LazyLoadService;
+    module.service("LazyLoadService", LazyLoadService);
+    module.directive("loadThenCompile", ["$animate", "$compile", "LazyLoadService",
+        function ($animate, $compile, lazyLoadService) {
+            var directiveDefinition = {
+                restrict: "AE",
+                compile: function ($compileElement, templateAttributes) {
+                    var angularModuleName = templateAttributes["ngModuleName"];
+                    var requireModulePath = templateAttributes["requireModulePath"];
+                    var hideWhileLoading = templateAttributes["hideWhileLoading"] == "true";
+                    var originalContent = $compileElement[0].innerHTML;
+                    if (hideWhileLoading) {
+                        $compileElement.html('');
+                    }
+                    return function ($scope, $postLinkElement, attrs, ctrl, $transclude) {
+                        lazyLoadService.getOrLoadModule(angularModuleName, requireModulePath)
+                            .then(function () {
+                            if (!hideWhileLoading) {
+                                $postLinkElement.html("");
+                                if ($postLinkElement.children().length > 0) {
+                                    $postLinkElement.html("");
+                                }
+                            }
+                            $animate.enter(originalContent, $postLinkElement)
+                                .then(function () {
+                                $compile($postLinkElement.contents())($scope);
+                            });
+                        });
+                    };
+                }
+            };
+            return directiveDefinition;
+        }
+    ]);
+});
+
+//# sourceMappingURL=lazy-load.module.js.map

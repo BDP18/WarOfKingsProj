@@ -1,0 +1,299 @@
+define(["require", "exports", "angularDependency", "lib/underscore", "util/value-proxy", "angularDependency", "angular/util/http-post-params-as-form.provider", "angular/util/lazy-load.module"], function (require, exports, angular, _, ValueProxy) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("reg-form.service", ["lazy-load.module", "study.http-post-params-as-form"]);
+    var RegFormService = (function () {
+        function RegFormService($http, $q, $scope, httpPostParamsAsFormConfig, lazyLoadService) {
+            var _this = this;
+            this.couponCode = null;
+            this.isRegDataAutoSaving = false;
+            this.isRegDataInitialized = false;
+            this.lastSavedRegDataValues = {};
+            this.regData = { info: {}, values: {} };
+            this.OBSCURED_VALUE = 'xxxxx';
+            this.productMapByCouponCodeCache = {};
+            this.$http = $http;
+            this.$q = $q;
+            this.$scope = $scope;
+            this.httpPostParamsAsFormConfig = httpPostParamsAsFormConfig;
+            this.lazyLoadService = lazyLoadService;
+            this.productMapProxy = new ValueProxy({}, function () {
+                var config = {
+                    params: {}
+                };
+                if (_this.couponCode) {
+                    config.params.couponCode = _this.couponCode;
+                }
+                var couponKeyForCache = _this.couponCode || "NO_COUPON";
+                if (_this.productMapByCouponCodeCache[couponKeyForCache]) {
+                    var cachedDeferred = _this.$q.defer();
+                    cachedDeferred.resolve(_this.productMapByCouponCodeCache[couponKeyForCache]);
+                    return cachedDeferred.promise;
+                }
+                return _this.$http.get("/academy/register/get-product-map.ajax", config)
+                    .then(function (response) {
+                    _this.productMapByCouponCodeCache[couponKeyForCache] = response.data;
+                    return response.data;
+                });
+            });
+        }
+        RegFormService.prototype.saveCurrentRegFormDataIfChanged = function () {
+            var regDataValuesToSave = this.copyRegDataValues(this.regData);
+            if (!angular.equals(regDataValuesToSave, this.lastSavedRegDataValues)) {
+                this.lastSavedRegDataValues = regDataValuesToSave;
+                return this.saveRegFormData(regDataValuesToSave)
+                    .then(function () { });
+            }
+            return this.$q.when();
+        };
+        RegFormService.prototype.saveRegFormData = function (regData) {
+            if (regData['password']) {
+                regData['password'] = this.OBSCURED_VALUE;
+            }
+            if (regData['passwordConfirm']) {
+                regData['passwordConfirm'] = this.OBSCURED_VALUE;
+            }
+            if (regData['creditCardCvc']) {
+                regData['creditCardCvc'] = this.OBSCURED_VALUE;
+            }
+            if (regData['creditCardNumber']) {
+                regData['creditCardNumber'] = this.OBSCURED_VALUE;
+            }
+            if (regData['expirationMonth']) {
+                regData['expirationMonth'] = this.OBSCURED_VALUE;
+            }
+            if (regData['expirationYear']) {
+                regData['expirationYear'] = this.OBSCURED_VALUE;
+            }
+            return this.saveRegFormDataIncludingPassword(regData);
+        };
+        RegFormService.prototype.saveRegFormDataIncludingPassword = function (regDataValues) {
+            regDataValues = this.copyRegDataValuesJustBeforeSaveAndMassageData(regDataValues);
+            return this.$http.post("/academy/register/save.ajax", regDataValues, this.httpPostParamsAsFormConfig)
+                .then(function (response) {
+                return response.data;
+            })["catch"](function () {
+                throw "Failed to save reg form data";
+            });
+        };
+        RegFormService.prototype.copyRegDataValuesJustBeforeSaveAndMassageData = function (regDataValues) {
+            var copy = angular.copy(regDataValues, {});
+            if (copy.schoolEnrollmentClassIds != null && copy.schoolEnrollmentClassIds.length === 0) {
+                copy.schoolEnrollmentClassIds = "[]";
+            }
+            return copy;
+        };
+        RegFormService.prototype.getRegFormDataInstance = function () {
+            if (!this.isRegDataInitialized) {
+                this.addInitialRegDataStateFromDOM();
+                this.isRegDataInitialized = true;
+            }
+            if (!this.isRegDataAutoSaving) {
+                this.registerAutoSaveListenerForRegData();
+                this.isRegDataAutoSaving = true;
+            }
+            return this.regData;
+        };
+        RegFormService.prototype.registerAutoSaveListenerForRegData = function () {
+            var _this = this;
+            var onChangeHandler = _.debounce(function () {
+                _this.saveCurrentRegFormDataIfChanged();
+            }, 500);
+            this.$scope.$watch(function () { return _this.regData.values; }, function () { onChangeHandler(); }, true);
+        };
+        RegFormService.prototype.decodeUnicode = function (encoded) {
+            encoded = encoded.replace(/\\'/g, '\'');
+            encoded = encoded.replace(/\\\\/g, '\\');
+            return decodeURIComponent(JSON.parse('"' + encoded + '"'));
+        };
+        RegFormService.prototype.addInitialRegDataStateFromDOM = function () {
+            var _this = this;
+            this.regData.values.billingAddressCountry = "US";
+            var dataElement = document.querySelector("#guestRegData");
+            if (dataElement != null) {
+                var advisorMemberId = dataElement.getAttribute("data-advisor-member-id");
+                if (this.isNotEmptyString(advisorMemberId)) {
+                    this.regData.values.advisorMemberId = parseInt(advisorMemberId);
+                }
+                var countryAttr = dataElement.getAttribute("data-country");
+                if (this.isNotEmptyString(countryAttr)) {
+                    this.regData.values.billingAddressCountry = countryAttr;
+                }
+                var cxAdvisorEmail = dataElement.getAttribute("data-cx-advisor-email");
+                if (this.isNotEmptyString(cxAdvisorEmail)) {
+                    this.regData.values.cxAdvisorEmail = this.decodeUnicode(cxAdvisorEmail);
+                }
+                var cxAdvisorName = dataElement.getAttribute("data-cx-advisor-name");
+                if (this.isNotEmptyString(cxAdvisorName)) {
+                    this.regData.values.cxAdvisorName = this.decodeUnicode(cxAdvisorName);
+                }
+                var cxPlannedSchool = dataElement.getAttribute("data-cx-planned-school");
+                if (this.isNotEmptyString(cxPlannedSchool)) {
+                    this.regData.values.cxPlannedSchool = this.decodeUnicode(cxPlannedSchool);
+                }
+                var cxPlannedSchoolCompanyId = dataElement.getAttribute("data-cx-planned-school-company-id");
+                if (this.isNotEmptyString(cxPlannedSchoolCompanyId)) {
+                    this.regData.values.cxPlannedSchoolCompanyId = parseInt(cxPlannedSchoolCompanyId);
+                }
+                var emailAttr = dataElement.getAttribute("data-email");
+                if (this.isNotEmptyString(emailAttr)) {
+                    this.regData.values.email = emailAttr;
+                }
+                var firstNameAttr = dataElement.getAttribute("data-first-name");
+                if (this.isNotEmptyString(firstNameAttr)) {
+                    this.regData.values.billingFirstName = this.decodeUnicode(firstNameAttr);
+                }
+                var goalsAttr = dataElement.getAttribute("data-goals");
+                if (this.isNotEmptyString(goalsAttr)) {
+                    this.regData.values.goals = goalsAttr;
+                }
+                var hasTransferSchool = dataElement.getAttribute("data-has-transfer-school");
+                if (this.isNotEmptyString(hasTransferSchool)) {
+                    this.regData.values.hasTransferSchool = hasTransferSchool.toLowerCase() === "true";
+                }
+                var lastNameAttr = dataElement.getAttribute("data-last-name");
+                if (this.isNotEmptyString(lastNameAttr)) {
+                    this.regData.values.billingLastName = this.decodeUnicode(lastNameAttr);
+                }
+                var phoneAttr = dataElement.getAttribute("data-phone");
+                if (this.isNotEmptyString(phoneAttr)) {
+                    this.regData.values.phoneNumber = phoneAttr;
+                }
+                var productAttr = dataElement.getAttribute("data-product");
+                if (this.isNotEmptyString(productAttr)) {
+                    this.regData.values.product = productAttr;
+                }
+                var referredByAdvisor = dataElement.getAttribute("data-referred-by-advisor");
+                if (this.isNotEmptyString(referredByAdvisor)) {
+                    this.regData.values.referredByAdvisor = referredByAdvisor.toLowerCase() === "true";
+                }
+                var schoolEnrollmentClassIds = dataElement.getAttribute("data-school-enrollment-class-ids");
+                if (this.isNotEmptyString(schoolEnrollmentClassIds)) {
+                    this.regData.values.schoolEnrollmentClassIds = JSON.parse(schoolEnrollmentClassIds);
+                }
+                else {
+                    this.regData.values.schoolEnrollmentClassIds = [];
+                }
+                var schoolEnrollmentGradeLevel = dataElement.getAttribute("data-school-enrollment-grade-level");
+                if (this.isNotEmptyString(schoolEnrollmentGradeLevel)) {
+                    this.regData.values.schoolEnrollmentGradeLevel = schoolEnrollmentGradeLevel;
+                }
+                var schoolEnrollmentSchoolId = dataElement.getAttribute("data-school-enrollment-school-id");
+                if (this.isNotEmptyString(schoolEnrollmentSchoolId)) {
+                    this.regData.values.schoolEnrollmentSchoolId = parseInt(schoolEnrollmentSchoolId, 10);
+                }
+                var schoolEnrollmentUnknownSchoolName = dataElement.getAttribute("data-school-enrollment-unknown-school-name");
+                if (this.isNotEmptyString(schoolEnrollmentUnknownSchoolName)) {
+                    this.regData.values.schoolEnrollmentUnknownSchoolName = this.decodeUnicode(schoolEnrollmentUnknownSchoolName);
+                }
+                var teacherSubjectAttr = dataElement.getAttribute("data-teacher-subject");
+                if (this.isNotEmptyString(teacherSubjectAttr)) {
+                    this.regData.values.teacherSubject = teacherSubjectAttr;
+                }
+                var userTypeAttr = dataElement.getAttribute("data-user-type");
+                if (this.isNotEmptyString(userTypeAttr)) {
+                    this.regData.values.userType = userTypeAttr;
+                }
+                var wantsFamilyPlanAttr = dataElement.getAttribute("data-wants-family-plan");
+                if (this.isNotEmptyString(wantsFamilyPlanAttr)) {
+                    this.regData.values.wantsFamilyPlan = wantsFamilyPlanAttr.toLowerCase() === "true";
+                }
+                angular.copy(this.regData.values, this.lastSavedRegDataValues);
+                this.regData.info.schoolEnrollmentClasses = [];
+                if (this.regData.values.schoolEnrollmentSchoolId) {
+                    this.getOrLoadSchoolClassService()
+                        .then(function (schoolClassService) {
+                        schoolClassService.findSchoolById(_this.regData.values.schoolEnrollmentSchoolId)
+                            .then(function (school) {
+                            _this.regData.info.schoolEnrollmentSchool = school;
+                        });
+                        if (_this.regData.values.schoolEnrollmentClassIds.length > 0) {
+                            schoolClassService.findClassesForSchoolIdByIds(_this.regData.values.schoolEnrollmentSchoolId, _this.regData.values.schoolEnrollmentClassIds)
+                                .then(function (classes) {
+                                _this.regData.info.schoolEnrollmentClasses = classes;
+                            });
+                        }
+                    });
+                }
+            }
+        };
+        RegFormService.prototype.getOrLoadSchoolClassService = function () {
+            return this.lazyLoadService.getOrLoadInjectable("school-class.service", "school-class/school-class.service", "SchoolClassService")
+                .then(function (schoolClassService) {
+                return schoolClassService;
+            });
+        };
+        RegFormService.prototype.modifySharedProductProxyWithCoupon = function (couponCode) {
+            var couponCodeChanged = this.couponCode !== couponCode;
+            this.couponCode = couponCode;
+            if (couponCodeChanged) {
+                this.productMapProxy.reloadValue();
+            }
+            return this.productMapProxy;
+        };
+        RegFormService.prototype.copyRegDataValues = function (sourceRegData) {
+            var copy = {};
+            angular.copy(sourceRegData.values, copy);
+            return copy;
+        };
+        RegFormService.prototype.isNotEmptyString = function (string) {
+            return string != null && string.length > 0;
+        };
+        RegFormService.prototype.submitPayPalRegistration = function (regData) {
+            regData = this.copyRegValuesWithoutSensitiveBillingData(regData);
+            return this.$http.post("/academy/register/beginPayPalRegistration.ajax", regData, this.httpPostParamsAsFormConfig);
+        };
+        RegFormService.prototype.postRegistrationData = function (registrationEndpoint, regData) {
+            var config = angular.copy(this.httpPostParamsAsFormConfig, {});
+            config.timeout = 1000 * 60 * 4;
+            regData = this.copyRegValuesWithoutSensitiveBillingData(regData);
+            var csrfElement = document.querySelector("meta[name=_csrf]");
+            var csrfHeaderElement = document.querySelector("meta[name=_csrf_header]");
+            if (csrfElement && csrfHeaderElement) {
+                var headerName = csrfHeaderElement.attributes['content'].value;
+                var headerValue = csrfElement.attributes['content'].value;
+                if (headerName && headerValue) {
+                    config.headers[headerName] = headerValue;
+                }
+            }
+            return this.$http.post(registrationEndpoint, regData, config);
+        };
+        RegFormService.prototype.copyRegValuesWithoutSensitiveBillingData = function (regData) {
+            var copyOfRegData = angular.copy(regData, {});
+            if (copyOfRegData["creditCardCvc"]) {
+                delete copyOfRegData["creditCardCvc"];
+            }
+            if (copyOfRegData["creditCardNumber"]) {
+                delete copyOfRegData["creditCardNumber"];
+            }
+            if (copyOfRegData["expirationMonth"]) {
+                delete copyOfRegData["expirationMonth"];
+            }
+            if (copyOfRegData["expirationYear"]) {
+                delete copyOfRegData["expirationYear"];
+            }
+            return copyOfRegData;
+        };
+        RegFormService.$inject = ["$http", "$q", "$rootScope", "httpPostParamsAsFormConfig", "LazyLoadService"];
+        return RegFormService;
+    }());
+    exports.RegFormService = RegFormService;
+    module.service("RegFormService", RegFormService);
+    module.directive("saveUserType", ["RegFormService", function (regFormService) {
+            return {
+                restrict: "A",
+                link: function (scope, element) {
+                    if (element.attr("save-user-type")) {
+                        element.on("click", function () {
+                            var userTypeValue = element.attr("save-user-type");
+                            regFormService.saveRegFormData({ "userType": userTypeValue });
+                            window._kiq = window._kiq || [];
+                            window._kiq.push(["set", { memberMemberPersona: userTypeValue }]);
+                        });
+                    }
+                }
+            };
+        }]);
+});
+
+//# sourceMappingURL=reg-form.service.js.map

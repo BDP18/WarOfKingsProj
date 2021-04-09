@@ -1,0 +1,232 @@
+define(["require", "exports", "jquery"], function (require, exports, $) {
+    "use strict";
+    var CourseNavigator = (function () {
+        function CourseNavigator(courseNavigatorElement, noFlyout) {
+            if (noFlyout === void 0) { noFlyout = false; }
+            var _this = this;
+            this.counter = 0;
+            this.$container = $(courseNavigatorElement);
+            this.$chapters = $(courseNavigatorElement).find('[data-name="chapter"]');
+            this.$scrollToContainer = this.$container.find('.ios-scrollable');
+            this.$headerContainer = this.$container.find('.courseNavHeader');
+            this.$lessonContainer = $(courseNavigatorElement).find('[data-name="lessonList"]');
+            this.currentLesson = this.$container.find('.is-viewing');
+            this.$chapters.find("a").on("click", function (e) { return e.preventDefault(); });
+            this.setupDynamicTopicLoading();
+            if (!noFlyout) {
+                this.placeholder =
+                    $("<div data-coursenavigatorplaceholder>").insertBefore(this.$container);
+                this.flyoutMql = window.matchMedia("(min-width: 768px)");
+                this.flyout();
+                this.flyoutMql.addListener(function () { return _this.flyout(); });
+                this.$container.on('shown.bs.offcanvas', function () { return _this.scrollToCurrentLesson(); });
+                this.$container.offcanvas({
+                    toggle: false,
+                    autohide: false
+                });
+                this.$scrollToContainer.on("scroll", function () { return _this.pinChapterHeader(); });
+            }
+        }
+        CourseNavigator.prototype.setupDynamicTopicLoading = function () {
+            var self = this;
+            var uri = '';
+            function clickHandler(i) {
+                var $el = $(this);
+                $el.off("click", clickHandler);
+                uri = $(this).find("a").eq(0).attr('href');
+                var aa = $el.data("aa");
+                $.ajax({
+                    type: "GET",
+                    url: '/academy/getLessonsInTopic.ajax',
+                    data: {
+                        topicURI: uri,
+                        courseAcademyAssetId: aa
+                    },
+                    dataType: 'json',
+                    success: function (data) {
+                        self.createHTML(data, i);
+                    },
+                    error: function (data) {
+                        $el.on("click", clickHandler);
+                    }
+                });
+            }
+            this.$chapters.each(function (index, el) {
+                if ($(el).is('[data-starting-chapter]')) {
+                    clickHandler.apply(el, [index]);
+                }
+                else if (!$(el).is('[data-loaded]')) {
+                    $(el).on("click", $.proxy(clickHandler, el, [index]));
+                }
+            });
+        };
+        CourseNavigator.prototype.createHTML = function (data, index) {
+            var self = this;
+            var htmlToAppend = '';
+            var nextLessonIndex = parseInt($(this.$lessonContainer[index]).attr('data-next-lesson-index') || "-1");
+            for (var i = 0; i < data.length; i++) {
+                if (nextLessonIndex === i) {
+                    htmlToAppend +=
+                        '<li class="next-lesson" data-cname="course_navigator_next_lesson" test-id="course_navigator_next_lesson">'
+                            + '<a href="' + data[i]['uri'] + '" '
+                            + self.makeVirtualAttr(data[i]['courseAcademyAssetId']) + '>';
+                    if (data[i]['type'] === 'LESSON') {
+                        htmlToAppend +=
+                            '<span class="lessonTime">' + self.convertSecondsToTime(data[i]['videoDuration'])
+                                + '</span>';
+                        htmlToAppend += '<p>Next Lesson</p>'
+                            + '<div class="imgWithPlayIcon" title="' + data[i]['title']
+                            + '" data-cname="course_nav_next_lesson_thumbnail" test-id="course_nav_next_lesson_thumbnail">'
+                            + '<img class="videoPreview" src="/cimages/videopreview/videopreview-small/'
+                            + data[i]['videoPreviewImageUri'] + '"/>'
+                            + '<span class="playIcon">'
+                            + '<span class="triangle"></span>'
+                            + '</span>'
+                            + '</div>'
+                            + '<span class="title" data-cname="course_nav_next_lesson_title" test-id="course_nav_next_lesson_title">'
+                            + data[i]['title'] + '</span>'
+                            + '</a>'
+                            + '</li>';
+                    }
+                    else if (data[i]['type'] === 'FLASHCARD_SET') {
+                        htmlToAppend += '<p>Next Set</p>'
+                            + '<div class="imgWithPlayIcon" title="' + data[i]['title']
+                            + '" data-cname="course_nav_next_lesson_thumbnail" test-id="course_nav_next_lesson_thumbnail">'
+                            + '<img src="/images/reDesign/flashcardsPreview.png" alt="' + data[i]['title']
+                            + '"/>'
+                            + '</div>'
+                            + '<span class="title" data-cname="course_nav_next_lesson_title" test-id="course_nav_next_lesson_title">'
+                            + data[i]['title'] + '</span>'
+                            + '</a>'
+                            + '</li>';
+                    }
+                    else {
+                        htmlToAppend += '<p>Next Lesson</p>'
+                            + '<div class="imgWithPlayIcon" title="' + data[i]['title']
+                            + '" data-cname="course_nav_next_lesson_thumbnail" test-id="course_nav_next_lesson_thumbnail">'
+                            + '<img src="/images/reDesign/defaultArticlePreview.png" alt="'
+                            + data[i]['title'] + '"/>'
+                            + '</div>'
+                            + '<span class="title" data-cname="course_nav_next_lesson_title" test-id="course_nav_next_lesson_title">'
+                            + data[i]['title'] + '</span>'
+                            + '</a>'
+                            + '</li>';
+                    }
+                }
+                else if (data[i]['type'] === 'FLASHCARD_SET') {
+                    htmlToAppend +=
+                        '<li><span class="icon icon-flash-cards"></span><a href="' + data[i]['uri'] + '"'
+                            + self.makeVirtualAttr(data[i]['courseAcademyAssetId']) + '>'
+                            + data[i]['title'] + '</a>';
+                    htmlToAppend += '</li>';
+                }
+                else {
+                    htmlToAppend +=
+                        '<li><a href="' + data[i]['uri'] + '"' + self.makeVirtualAttr(data[i]['courseAcademyAssetId']) + '>'
+                            + data[i]['title'] + '</a>';
+                    if (data[i]['type'] === 'LESSON') {
+                        htmlToAppend +=
+                            '<span class="lessonTime">' + self.convertSecondsToTime(data[i]['videoDuration'])
+                                + '</span>';
+                    }
+                    htmlToAppend += '</li>';
+                }
+            }
+            $(this.$lessonContainer[index]).prepend(htmlToAppend);
+            if (self.counter === 0) {
+                self.scrollToCurrentLesson();
+                self.counter++;
+            }
+        };
+        CourseNavigator.prototype.makeVirtualAttr = function (ancestryId) {
+            return "data-virtual=\"" + ancestryId + "\"";
+        };
+        CourseNavigator.prototype.convertSecondsToTime = function (seconds) {
+            var m = Math.floor(seconds / 60);
+            var s = this._twoDigitSeconds(seconds % 60);
+            return m + ':' + s;
+        };
+        CourseNavigator.prototype._twoDigitSeconds = function (seconds) {
+            if (seconds > 9) {
+                return seconds;
+            }
+            else {
+                return '0' + seconds;
+            }
+        };
+        CourseNavigator.prototype.scrollToCurrentLesson = function (attemptsLeft) {
+            var _this = this;
+            if (attemptsLeft === void 0) { attemptsLeft = 2; }
+            var jQueryAnimationQueueName = "courseNavScrollQueue";
+            try {
+                this.$scrollToContainer.stop(jQueryAnimationQueueName, true);
+                var desiredScrollTop_1 = this.computeScrollToCurrentLessonScrollTop();
+                this.$scrollToContainer
+                    .animate({ scrollTop: desiredScrollTop_1 }, {
+                    queue: jQueryAnimationQueueName,
+                    done: function () {
+                        window.setTimeout(function () {
+                            desiredScrollTop_1 = _this.computeScrollToCurrentLessonScrollTop();
+                            if (desiredScrollTop_1 != _this.$scrollToContainer.scrollTop()) {
+                                attemptsLeft--;
+                                if (attemptsLeft > 0) {
+                                    _this.scrollToCurrentLesson(attemptsLeft);
+                                }
+                            }
+                        }, 250);
+                    }
+                })
+                    .dequeue(jQueryAnimationQueueName);
+            }
+            catch (e) {
+            }
+        };
+        CourseNavigator.prototype.computeScrollToCurrentLessonScrollTop = function () {
+            var chapterHtmlId = this.currentLesson.attr("id");
+            if (!chapterHtmlId) {
+                chapterHtmlId = this.currentLesson.closest(".chapterContent").attr("id");
+            }
+            var chapterHeader = $("[data-toggle=collapse][data-target=#" + chapterHtmlId + "]");
+            var desiredScrollTop = this.currentLesson.position().top
+                + this.$scrollToContainer.scrollTop()
+                - chapterHeader.outerHeight();
+            var maxScroll = this.$scrollToContainer[0].scrollHeight - this.$scrollToContainer[0].clientHeight;
+            var actualScrollTop = (maxScroll < desiredScrollTop) ? maxScroll : desiredScrollTop;
+            return actualScrollTop;
+        };
+        CourseNavigator.prototype.pinChapterHeader = function () {
+            var chapterHeaderToSticky;
+            var scrolledOffTopHeaders = this.$chapters.closest(".stickable").filter(function (index, el) {
+                return $(el).position().top <= 0;
+            }).find(this.$chapters);
+            if (!scrolledOffTopHeaders.last().hasClass("collapsed")) {
+                chapterHeaderToSticky = scrolledOffTopHeaders.last();
+            }
+            var chapterHeadersToReset = this.$chapters.not(chapterHeaderToSticky);
+            chapterHeadersToReset.css("position", "");
+            chapterHeadersToReset.css("top", "");
+            chapterHeadersToReset.closest(".stickable").css("height", "");
+            if (chapterHeaderToSticky) {
+                chapterHeaderToSticky.closest(".stickable").css("height", chapterHeaderToSticky.outerHeight());
+                chapterHeaderToSticky.css("position", "absolute");
+                chapterHeaderToSticky.css("top", this.$scrollToContainer.scrollTop());
+            }
+        };
+        CourseNavigator.prototype.flyout = function () {
+            if (!this.flyoutMql.matches) {
+                this.$container.addClass('navmenu navmenu-default navmenu-fixed-left offcanvas');
+                this.$container.appendTo('[data-coursenavigatorbottom]');
+            }
+            else {
+                this.$container.removeClass('navmenu navmenu-default navmenu-fixed-left offcanvas');
+                this.$container.insertAfter(this.placeholder);
+                this.scrollToCurrentLesson();
+            }
+        };
+        ;
+        return CourseNavigator;
+    }());
+    return CourseNavigator;
+});
+
+//# sourceMappingURL=courseNavigator.js.map

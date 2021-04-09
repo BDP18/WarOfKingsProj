@@ -1,0 +1,78 @@
+define(["require", "exports", "angularDependency"], function (require, exports, angular) {
+    "use strict";
+    var ValueProxy = (function () {
+        function ValueProxy(initialValue, valueLoader) {
+            this.value = initialValue;
+            this.valueLoader = valueLoader;
+            this.callbacks = [];
+            this.isLoading = false;
+            this.promiseToLoadData = null;
+        }
+        ValueProxy.prototype.getValue = function () {
+            if (this.promiseToLoadData) {
+                return this.promiseToLoadData;
+            }
+            return this.reloadValue();
+        };
+        ;
+        ValueProxy.prototype.reloadValue = function () {
+            var _this = this;
+            if (this.isLoading) {
+                return this.promiseToLoadData.then(function () {
+                    return _this.reloadValue();
+                });
+            }
+            this.isLoading = true;
+            this.promiseToLoadData = this.valueLoader()
+                .then(function (value) {
+                _this.clearValue();
+                angular.extend(_this.value, value);
+                _this.triggerListeners();
+                return _this.value;
+            })["finally"](function () {
+                _this.isLoading = false;
+            });
+            return this.promiseToLoadData;
+        };
+        ;
+        ValueProxy.prototype.triggerListeners = function () {
+            for (var _i = 0, _a = this.callbacks; _i < _a.length; _i++) {
+                var callback = _a[_i];
+                callback(this.value);
+            }
+        };
+        ValueProxy.prototype.addValueListener = function (callback) {
+            this.callbacks.push(callback);
+            if (!this.isLoading && this.promiseToLoadData != null) {
+                callback(this.value);
+            }
+            return this.callbacks.length - 1;
+        };
+        ValueProxy.prototype.removeValueListener = function (index) {
+            this.callbacks.splice(index, 1);
+        };
+        ValueProxy.prototype.clearValue = function () {
+            if (this.value) {
+                if (this.value instanceof Array) {
+                    this.value.length = 0;
+                }
+                else {
+                    var valueObject = this.value;
+                    for (var member in valueObject) {
+                        if (valueObject.hasOwnProperty(member)) {
+                            delete valueObject[member];
+                        }
+                    }
+                }
+            }
+        };
+        ;
+        ValueProxy.prototype.isActive = function () {
+            return this.promiseToLoadData != null;
+        };
+        return ValueProxy;
+    }());
+    return ValueProxy;
+});
+
+//# sourceMappingURL=value-pro.js.map

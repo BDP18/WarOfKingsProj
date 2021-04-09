@@ -1,0 +1,77 @@
+define(["require", "exports", "jquery", "util/remspect", "lib/jquery/cookie"], function (require, exports, $, remspect) {
+    "use strict";
+    var Listrak = (function () {
+        function Listrak() {
+            this.product = '';
+            this.listrakLoaded = false;
+            if (this.isInTest()) {
+                if (this.isTracked()) {
+                    this.loadListrak();
+                }
+                if (this.checkUrl("src=ltk")) {
+                    this.startTracking();
+                }
+                if (this.checkUrl("/academy/course/")) {
+                    this.startTracking();
+                }
+            }
+        }
+        Listrak.prototype.executeAsyncListrak = function (codeToRun) {
+            (function () { if (typeof window._ltk == 'object') {
+                ltkCode();
+            }
+            else {
+                (function (d) { if (document.addEventListener)
+                    document.addEventListener('ltkAsyncListener', d);
+                else {
+                    var e = document.documentElement;
+                    e.ltkAsyncProperty = 0;
+                    e.attachEvent('onpropertychange', function (e) { if (e.propertyName == 'ltkAsyncProperty') {
+                        d();
+                    } });
+                } })(function () { ltkCode(); });
+            } function ltkCode() { window._ltk_util.ready(codeToRun); } })();
+        };
+        Listrak.prototype.saveData = function (regValues) {
+            var _this = this;
+            if (this.isInTest()) {
+                this.startTracking();
+                if (regValues.product != this.product) {
+                    this.product = regValues.product;
+                    var browseFunction = function () { window._ltk.Activity.AddProductBrowse(_this.product); };
+                    this.executeAsyncListrak(browseFunction);
+                }
+            }
+        };
+        Listrak.prototype.isInTest = function () {
+            return remspect.isVariation('listrak', 'x');
+        };
+        Listrak.prototype.checkUrl = function (value) {
+            return window.location.href.indexOf(value) > -1;
+        };
+        Listrak.prototype.isTracked = function () {
+            var isTracked = false;
+            if ($.cookie('listrak')) {
+                var trackPageViewCookie = $.cookie('listrak');
+                isTracked = (trackPageViewCookie === 'true');
+            }
+            return isTracked;
+        };
+        Listrak.prototype.loadListrak = function () {
+            if (!this.listrakLoaded) {
+                var captureEmail = function () { window._ltk.SCA.CaptureEmail('email'); };
+                this.executeAsyncListrak(captureEmail);
+                require(['lib/listrak']);
+                this.listrakLoaded = true;
+            }
+        };
+        Listrak.prototype.startTracking = function () {
+            $.cookie('listrak', true, { path: '/', expires: 730 });
+            this.loadListrak();
+        };
+        return Listrak;
+    }());
+    return Listrak;
+});
+
+//# sourceMappingURL=listrak.js.map

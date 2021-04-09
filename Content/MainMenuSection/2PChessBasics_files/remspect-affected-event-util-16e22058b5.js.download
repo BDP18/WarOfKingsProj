@@ -1,0 +1,58 @@
+define(["require", "exports", "eventLogging", "util/remspect"], function (require, exports, eventLogging, remspect) {
+    "use strict";
+    var RemspectAffectedEventUtil = (function () {
+        function RemspectAffectedEventUtil() {
+            this.hasSentEventForFactorMap = {};
+        }
+        RemspectAffectedEventUtil.prototype.sendRemspectAffectedEventIfAssigned = function (factor, eventInfo) {
+            var factorTrimmed = factor.trim();
+            if (remspect.isAssignedToFactor(factorTrimmed)) {
+                var loggableEvent = new eventLogging.LoggableEvent("RemspectAffectedEvent", false);
+                loggableEvent.remspectFactor = factorTrimmed;
+                loggableEvent.eventInfo = eventInfo;
+                var memberDataElement = document.querySelectorAll("[data-member-id]");
+                if (memberDataElement.length > 0) {
+                    loggableEvent.memberId = memberDataElement[0].getAttribute("data-member-id");
+                }
+                eventLogging.queueEvent(loggableEvent);
+            }
+        };
+        RemspectAffectedEventUtil.prototype.sendUniqueRemspectAffectedEventIfAssigned = function (factor, eventInfo) {
+            if (eventInfo === void 0) { eventInfo = ""; }
+            if (!this.hasEventBeenSent(factor, eventInfo)) {
+                this.sendRemspectAffectedEventIfAssigned(factor, eventInfo);
+                this.markEventAsSent(factor, eventInfo);
+            }
+        };
+        RemspectAffectedEventUtil.prototype.sendRemspectAffectedEventsIfAssigned = function (factors, eventInfo) {
+            var _this = this;
+            factors.forEach(function (factor) {
+                _this.sendRemspectAffectedEventIfAssigned(factor, eventInfo);
+            });
+        };
+        RemspectAffectedEventUtil.prototype.sendUniqueRemspectAffectedEventsIfAssigned = function (factors, eventInfo) {
+            var _this = this;
+            factors.forEach(function (factor) {
+                _this.sendUniqueRemspectAffectedEventIfAssigned(factor, eventInfo);
+            });
+        };
+        RemspectAffectedEventUtil.prototype.buildEventKey = function (factor, eventInfo) {
+            if (!eventInfo) {
+                eventInfo = "";
+            }
+            return factor.trim() + "___" + eventInfo;
+        };
+        RemspectAffectedEventUtil.prototype.hasEventBeenSent = function (factor, eventInfo) {
+            var eventKey = this.buildEventKey(factor, eventInfo);
+            return this.hasSentEventForFactorMap[eventKey];
+        };
+        RemspectAffectedEventUtil.prototype.markEventAsSent = function (factor, eventInfo) {
+            var eventKey = this.buildEventKey(factor, eventInfo);
+            this.hasSentEventForFactorMap[eventKey] = true;
+        };
+        return RemspectAffectedEventUtil;
+    }());
+    return new RemspectAffectedEventUtil();
+});
+
+//# sourceMappingURL=remspect-affected-event-util.js.map

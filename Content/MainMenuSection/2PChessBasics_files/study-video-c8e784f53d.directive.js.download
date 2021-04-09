@@ -1,0 +1,72 @@
+define(["require", "exports", "angularDependency", "angularDependency"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("study-video.directive", []);
+    var StudyVideoController = (function () {
+        function StudyVideoController($sce) {
+            this.hasBeenClicked = false;
+            this.$sce = $sce;
+        }
+        StudyVideoController.prototype.$onInit = function () {
+            this.videoUrlTrusted = this.$sce.trustAsResourceUrl(this.videoDomain + this.videoPath + ".mp4");
+        };
+        StudyVideoController.prototype.loadVideo = function () {
+            if (!this.hasBeenClicked) {
+                this.hasBeenClicked = true;
+            }
+        };
+        StudyVideoController.$inject = ["$sce"];
+        return StudyVideoController;
+    }());
+    exports.StudyVideoController = StudyVideoController;
+    module.directive("studyVideo", function () {
+        return {
+            restrict: "E",
+            scope: {
+                dataCname: "@cname",
+                previewImageUrl: '@',
+                videoDomain: '@',
+                videoPath: '@'
+            },
+            bindToController: true,
+            controller: StudyVideoController,
+            controllerAs: "videoCtrl",
+            template: ""
+                + "<div class='study-video'>"
+                + "<div class='study-video__play-icon' ng-if='!videoCtrl.hasBeenClicked' ng-click='videoCtrl.loadVideo()' role='button'"
+                + " data-cname='{{videoCtrl.dataCname}}__play_button'></div>"
+                + "<img class='study-video__background' ng-src='{{videoCtrl.previewImageUrl}}' ng-if='!videoCtrl.hasBeenClicked' ng-click='videoCtrl.loadVideo()' role='button'"
+                + " data-cname='{{videoCtrl.dataCname}}__preview_image' />"
+                + "<video class='study-video__video' ng-attr-poster='{{videoCtrl.previewImageUrl}}' ng-if='videoCtrl.hasBeenClicked' playsinline controls autoplay controlsList='nodownload'>"
+                + "<source ng-src='{{videoCtrl.videoUrlTrusted}}' type='video/mp4'>"
+                + "</video>"
+                + "</div>"
+        };
+    });
+    module.directive("studyVideoLazy", function () {
+        return {
+            restrict: "E",
+            scope: {
+                dataCname: "@cname",
+                previewImageUrl: '@',
+                videoDomain: '@',
+                videoPath: '@'
+            },
+            bindToController: true,
+            controller: StudyVideoController,
+            controllerAs: "videoCtrl",
+            template: ""
+                + "<div class='study-video'>"
+                + "<div class='study-video__play-icon' ng-if='!videoCtrl.hasBeenClicked' ng-click='videoCtrl.loadVideo()' role='button'"
+                + " data-cname='{{videoCtrl.dataCname}}__play_button'></div>"
+                + "<img class='study-video__background' ng-attr-data-lazy-src='{{videoCtrl.previewImageUrl}}' ng-if='!videoCtrl.hasBeenClicked' ng-click='videoCtrl.loadVideo()' role='button'"
+                + " data-cname='{{videoCtrl.dataCname}}__preview_image' />"
+                + "<video class='study-video__video' ng-attr-poster='{{videoCtrl.previewImageUrl}}' ng-if='videoCtrl.hasBeenClicked' playsinline controls autoplay controlsList='nodownload'>"
+                + "<source ng-src='{{videoCtrl.videoUrlTrusted}}' type='video/mp4'>"
+                + "</video>"
+                + "</div>"
+        };
+    });
+});
+
+//# sourceMappingURL=study-video.directive.js.map

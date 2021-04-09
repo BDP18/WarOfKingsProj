@@ -1,0 +1,32 @@
+define(["require", "exports", "angular/modal/study-modal.service", "angularDependency", "lib/jquery/bootstrap"], function (require, exports, study_modal_service_1, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var PlacementTestModalController = (function () {
+        function PlacementTestModalController($filter, $scope, studyModalService) {
+            this.$filter = $filter;
+            this.$scope = $scope;
+            this.studyModalService = studyModalService;
+        }
+        PlacementTestModalController.prototype.openPlacementModal = function () {
+            var modalSize = study_modal_service_1.StudyModalService.SIZE_SMALL;
+            var modalSettings = {
+                controller: [],
+                controllerAs: 'modalCtrl',
+                templateUrl: "/templates/collegeAccelerator/course-page-placement-test-modal.tpl",
+                size: modalSize,
+                windowClass: ""
+            };
+            var modalInstance = this.studyModalService.openModal([function () { }], "lg", "/templates/collegeAccelerator/course-page-placement-test-modal.tpl");
+            modalInstance.result
+                .then(function () {
+            })["catch"](function () {
+            });
+        };
+        PlacementTestModalController.$inject = ["$filter", "$scope", "studyModalService"];
+        return PlacementTestModalController;
+    }());
+    angular.module("placement-test-logged-out-modal.directive", [])
+        .controller("PlacementTestModalController", PlacementTestModalController);
+});
+
+//# sourceMappingURL=placement-test-logged-out-modal.directive.js.map

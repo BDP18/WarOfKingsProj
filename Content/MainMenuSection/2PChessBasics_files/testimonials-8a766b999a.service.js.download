@@ -1,0 +1,46 @@
+define(["require", "exports", "angularDependency"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var TestimonialsService = (function () {
+        function TestimonialsService($http) {
+            this.$http = $http;
+        }
+        TestimonialsService.prototype.getTestimonialsForTagTree = function (treeId) {
+            return this.$http.get("/academy/testimonialsForTagTree.ajax?testimonialTagTreeId=" + treeId)
+                .then(function (response) {
+                return response.data;
+            });
+        };
+        TestimonialsService.prototype.getTestimonialsForTag = function (tagPathToken, limit) {
+            return this.$http.get("/academy/testimonialsForTag.ajax?tagPathToken=" + tagPathToken + "&limit=" + limit)
+                .then(function (response) {
+                return response.data;
+            });
+        };
+        TestimonialsService.prototype.getTestimonialsForLessonPage = function (lessonId, courseId) {
+            var queryString = "";
+            if (lessonId) {
+                queryString = "?lessonId=" + lessonId;
+                if (courseId) {
+                    queryString += "&courseId=" + courseId;
+                }
+            }
+            else if (courseId) {
+                queryString = "?courseId=" + courseId;
+            }
+            return this.$http.get("/academy/testimonialsForLessonPage.ajax" + queryString)
+                .then(function (response) {
+                return response.data;
+            })["catch"](function (response) {
+                throw "failed to read testimonial list";
+            });
+        };
+        TestimonialsService.$inject = ["$http"];
+        return TestimonialsService;
+    }());
+    exports.TestimonialsService = TestimonialsService;
+    var module = angular.module("testimonials.service", []);
+    module.service("testimonialsService", TestimonialsService);
+});
+
+//# sourceMappingURL=testimonials.service.js.map

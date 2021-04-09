@@ -1,0 +1,92 @@
+define(["require", "exports", "jquery"], function (require, exports, $) {
+    "use strict";
+    var TranscriptClickHandler = (function () {
+        function TranscriptClickHandler() {
+        }
+        TranscriptClickHandler.prototype.initialize = function () {
+            function studyGuideTriggerTranscriptTab(updateHistory) {
+                if (updateHistory === void 0) { updateHistory = true; }
+                studyGuideSetVideoTabActive();
+                $("[data-video-tab-group]").hide();
+                $("[data-video-tab]").removeClass("active");
+                $("[data-transcript-tab]").addClass("active");
+                if (updateHistory) {
+                    history.pushState({}, "", window.location.pathname + "#" + TranscriptClickHandler.TRANSCRIPT_ELEMENT_TAB_ID);
+                }
+            }
+            function studyGuideSetVideoTabActive() {
+                var videoTab = $("[data-video-tab]");
+                var tabTarget = $(videoTab.children("a").data("target"));
+                if (!tabTarget.hasClass("active")) {
+                    $(".study-guide-page-tabs__tab").removeClass("active");
+                    $(".tab-pane").removeClass("active in");
+                    videoTab.addClass("active");
+                    tabTarget.addClass("active in");
+                }
+            }
+            function studyGuideTriggerVideoTab(updateHistory) {
+                if (updateHistory === void 0) { updateHistory = true; }
+                studyGuideSetVideoTabActive();
+                $("[data-video-tab-group]").show();
+                if (updateHistory) {
+                    history.pushState({}, "", window.location.pathname);
+                }
+            }
+            function studyGuideCheckLocationAndTriggerCorrectTab(updateHistory) {
+                if (window.location.hash.replace(/^#\/?/, "") === TranscriptClickHandler.TRANSCRIPT_ELEMENT_TAB_ID) {
+                    studyGuideTriggerTranscriptTab(updateHistory);
+                }
+                else {
+                    studyGuideTriggerVideoTab(updateHistory);
+                }
+            }
+            $(document).ready(function () {
+                var studyGuideTrigger = $("[data-transcript-trigger-study-guide]").length > 0;
+                if (studyGuideTrigger) {
+                    studyGuideCheckLocationAndTriggerCorrectTab(false);
+                    window.onpopstate = function () {
+                        studyGuideCheckLocationAndTriggerCorrectTab(false);
+                    };
+                }
+                $("[data-transcript-trigger]").click(function () {
+                    if (studyGuideTrigger) {
+                        studyGuideTriggerTranscriptTab();
+                    }
+                    else {
+                        var urlWithTranscript = $(this).data(TranscriptClickHandler.TRANSCRIPT_TRIGGER_DATA_ATTR);
+                        var isTranscriptOnCurrentPage = (window.location.pathname === urlWithTranscript);
+                        if (!isTranscriptOnCurrentPage) {
+                            window.location.assign(urlWithTranscript + "#" + TranscriptClickHandler.TRANSCRIPT_ELEMENT_ID);
+                        }
+                        else {
+                            window.location.hash = TranscriptClickHandler.LESSON_TAB_ID;
+                            setTimeout(function () {
+                                window.location.hash = TranscriptClickHandler.TRANSCRIPT_ELEMENT_ID;
+                            }, TranscriptClickHandler.SCROLL_TO_TRANSCRIPT_DELAY);
+                        }
+                    }
+                });
+                if (studyGuideTrigger) {
+                    $("[data-video-trigger]").click(function () {
+                        studyGuideTriggerVideoTab();
+                    });
+                }
+                $("[data-additional-activities-trigger]").on("click", function () {
+                    setTimeout(function () {
+                        window.location.hash = TranscriptClickHandler.ADDITIONAL_ACTIVITIES_ELEMENT_ID;
+                    }, TranscriptClickHandler.SCROLL_TO_TRANSCRIPT_DELAY);
+                });
+            });
+        };
+        TranscriptClickHandler.LESSON_TAB_ID = "lesson";
+        TranscriptClickHandler.SCROLL_TO_TRANSCRIPT_DELAY = 500;
+        TranscriptClickHandler.TRANSCRIPT_ELEMENT_ID = "transcriptHeader";
+        TranscriptClickHandler.TRANSCRIPT_ELEMENT_TAB_ID = "transcriptTab";
+        TranscriptClickHandler.TRANSCRIPT_TRIGGER_DATA_ATTR = "transcript-trigger";
+        TranscriptClickHandler.ADDITIONAL_ACTIVITIES_ELEMENT_ID = "additionalActivities";
+        return TranscriptClickHandler;
+    }());
+    return TranscriptClickHandler;
+});
+
+//# sourceMappingURL=transcript-click-handler.js.map

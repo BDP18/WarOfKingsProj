@@ -1,0 +1,40 @@
+define(["require", "exports", "angularDependency", "angularDependency", "classroom/schoology.service"], function (require, exports, angular) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("schoology.directive", ["schoology.service"]);
+    function showOrHideElement(element, showOrHide) {
+        if (showOrHide) {
+            element.removeClass("ng-hide");
+        }
+        else {
+            element.addClass("ng-hide");
+        }
+    }
+    function schoologyDirectiveFactory(module, directiveName, showIfHasFeature) {
+        var directiveFactory = ["$timeout", "schoologyService",
+            function ($timeout, schoologyService) {
+                var link = function (scope, element) {
+                    var isSchoologyAccount = schoologyService.isSchoologyAccount();
+                    showOrHideElement(element, (isSchoologyAccount && showIfHasFeature) || (!isSchoologyAccount && !showIfHasFeature));
+                    var clearWatch = scope.$watch(function () { return schoologyService.schoologyAccountId; }, function (newValue) {
+                        showOrHideElement(element, (newValue && showIfHasFeature) || (!newValue && !showIfHasFeature));
+                        if (newValue) {
+                            clearWatch();
+                        }
+                    });
+                    $timeout(clearWatch, 5000);
+                };
+                return {
+                    restrict: "EA",
+                    transclude: false,
+                    scope: {},
+                    link: link
+                };
+            }];
+        module.directive(directiveName, directiveFactory);
+    }
+    schoologyDirectiveFactory(module, "showIfIsSchoologyAccount", true);
+    schoologyDirectiveFactory(module, "hideIfIsSchoologyAccount", false);
+});
+
+//# sourceMappingURL=schoology.directive.js.map

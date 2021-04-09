@@ -1,0 +1,127 @@
+define(["require", "exports", "angularDependency", "lib/toastr", "angularDependency", "angular/util/http-post-params-as-form.provider", "lib/toastr", "member/info/member-info.service"], function (require, exports, angular, toastr) {
+    "use strict";
+    exports.__esModule = true;
+    var module = angular.module("schoology.service", ["study.http-post-params-as-form"]);
+    var SchoologyService = (function () {
+        function SchoologyService($http, $q, httpPostParamsAsFormConfig, memberInfoService) {
+            var _this = this;
+            this.$http = $http;
+            this.$q = $q;
+            this.httpPostParamsAsFormConfig = httpPostParamsAsFormConfig;
+            this.schoologyAccountId = null;
+            memberInfoService.memberInfoProxy.getValue()
+                .then(function (memberInfo) {
+                _this.schoologyAccountId = memberInfo.schoologyId;
+            });
+        }
+        SchoologyService.prototype.displayReauthMessage = function () {
+            var options = {
+                timeOut: 0,
+                extendedTimeOut: 0,
+                escapeHtml: false,
+                positionClass: "toast-top-center"
+            };
+            toastr.warning("<a class='btn btn-primary btn-md' href='/integration/lti/schoology/reauth.html'>Re-authorize</a>", "Schoology access token expired", options);
+        };
+        SchoologyService.prototype.displayApiErrorMessage = function (msg) {
+            toastr.error("The Schoology API returned this error: " + msg, "Schoology error occurred", { positionClass: "toast-top-center" });
+        };
+        SchoologyService.prototype.displayStudyErrorMessage = function (msg) {
+            toastr.error(msg, "Error", { positionClass: "toast-top-center" });
+        };
+        SchoologyService.prototype.handleErrorResponse = function (response) {
+            var responseData = null;
+            if (response.data) {
+                if (typeof response.data == "string") {
+                    responseData = response.data;
+                }
+            }
+            if (!responseData) {
+                responseData = response.statusText || "" + response.status;
+            }
+            if (response.status == SchoologyService.ACCESS_TOKEN_EXPIRED_STATUS) {
+                this.displayReauthMessage();
+            }
+            else if (responseData.indexOf("maximum number of students") > -1) {
+                this.displayStudyErrorMessage(responseData);
+            }
+            else {
+                this.displayApiErrorMessage(responseData);
+            }
+        };
+        SchoologyService.prototype.getSections = function () {
+            var _this = this;
+            return this.$http.get("/member/classrooms/schoology/sections.ajax")
+                .then(function (response) {
+                return response.data;
+            })["catch"](function (response) {
+                _this.handleErrorResponse(response);
+                return [];
+            });
+        };
+        SchoologyService.prototype.syncNewClassrooms = function (sections) {
+            var _this = this;
+            var url = "/member/classrooms/schoology/sync-classrooms.ajax";
+            return this.$http.post(url, sections)
+                .then(function (response) {
+                if (response.data.length > 0) {
+                    toastr.warning("Failed to sync the following email addresses:  " + response.data.join(", "), "Error syncing some users", { positionClass: "toast-top-center" });
+                }
+                return null;
+            })["catch"](function (response) {
+                var duplicateRegex = /Duplicate entry '\d+-(.*)' for key/;
+                var regexMatch = response.data.match(duplicateRegex);
+                if (regexMatch && regexMatch.length > 1 && regexMatch[1] && regexMatch[1].length > 0) {
+                    return _this.$q.reject(regexMatch[1]);
+                }
+                else {
+                    _this.handleErrorResponse(response);
+                    return null;
+                }
+            });
+        };
+        SchoologyService.prototype.syncExistingClassroom = function (sectionId, classroomId) {
+            var _this = this;
+            var url = "/member/classrooms/schoology/sync-classroom.ajax?sectionId=" + sectionId;
+            url += "&classroomId=" + classroomId;
+            return this.$http.get(url)
+                .then(function (response) {
+                if (response.data.length > 0) {
+                    toastr.warning("Failed to sync the following email addresses:  " + response.data.join(", "), "Error syncing some users", { positionClass: "toast-top-center" });
+                }
+                return response.data;
+            })["catch"](function (response) {
+                _this.handleErrorResponse(response);
+                return null;
+            });
+        };
+        SchoologyService.prototype.mergeClassroom = function (section) {
+            var _this = this;
+            var url = "/member/classrooms/schoology/merge-classroom.ajax";
+            var params = {
+                sectionId: section.id,
+                classroomName: section.courseTitle + ": " + section.sectionTitle
+            };
+            return this.$http.post(url, params, this.httpPostParamsAsFormConfig)
+                .then(function (response) {
+                if (response.data.length > 0) {
+                    toastr.warning("Failed to sync the following email addresses:  " + response.data.join(", "), "Error syncing some users", { positionClass: "toast-top-center" });
+                }
+                return null;
+            })["catch"](function (response) {
+                _this.handleErrorResponse(response);
+                return null;
+            });
+        };
+        SchoologyService.prototype.isSchoologyAccount = function () {
+            return !!this.schoologyAccountId;
+        };
+        SchoologyService.ACCESS_TOKEN_EXPIRED_STATUS = 418;
+        SchoologyService.$inject = ["$http", "$q", "httpPostParamsAsFormConfig", "MemberInfoService"];
+        return SchoologyService;
+    }());
+    exports.SchoologyService = SchoologyService;
+    module.service("schoologyService", SchoologyService);
+});
+
+//# sourceMappingURL=schoology.service.js.map
